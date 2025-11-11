@@ -1,22 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Detect user shell (bash/fish, default to bash)
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+LIB_DIR="${SCRIPT_DIR}/../lib"
+source "${LIB_DIR}/common.sh"
+
 CURRENT_SHELL=${SHELL:-}
 SHELL_NAME=$(basename "${CURRENT_SHELL:-sh}")
 case "$SHELL_NAME" in
   bash|fish) ;;
   *) SHELL_NAME=bash ;;
 esac
-
-need_cmd() { command -v "$1" >/dev/null 2>&1; }
-
-require_sudo() {
-  if ! need_cmd sudo; then
-    echo "sudo is required to install packages" >&2
-    exit 1
-  fi
-}
 
 enable_and_start() {
   if need_cmd systemctl; then

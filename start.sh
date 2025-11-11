@@ -3,98 +3,21 @@ set -euo pipefail
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 SRC_DIR="${SCRIPT_DIR}/src"
+LIB_DIR="${SCRIPT_DIR}/lib"
 
-# Colors
-if [ -t 1 ]; then
-  C_RESET="\033[0m"; C_BOLD="\033[1m"; C_DIM="\033[2m";
-  C_CYAN="\033[36m"; C_GREEN="\033[32m"; C_YELLOW="\033[33m"; C_WHITE="\033[97m"; C_MAGENTA="\033[35m"; C_BLUE="\033[34m"; C_RED="\033[31m"
-else
-  C_RESET=""; C_BOLD=""; C_DIM=""; C_CYAN=""; C_GREEN=""; C_YELLOW=""; C_WHITE=""; C_MAGENTA=""; C_BLUE=""; C_RED=""
-fi
-
-need_cmd() { command -v "$1" >/dev/null 2>&1; }
-numfmt_gib() { awk -v b="$1" 'BEGIN {printf "%.2f", b/1024/1024/1024}'; }
+source "${LIB_DIR}/common.sh"
 
 maybe_update_upgrade() {
   echo
-  read -r -p "Run system package update/upgrade now? (y/n): " ans || true
-  case "${ans,,}" in
-    y|yes)
-      if ! need_cmd sudo; then
-        echo -e "${C_RED}sudo not found. Cannot perform update as non-root.${C_RESET}"
-        return 0
-      fi
-      echo -e "${C_CYAN}Updating packages...${C_RESET}"
-      if need_cmd apt-get; then
-        sudo apt-get update -y && sudo apt-get upgrade -y || true
-      elif need_cmd dnf; then
-        sudo dnf -y upgrade || true
-      elif need_cmd yum; then
-        sudo yum -y update || true
-      elif need_cmd zypper; then
-        sudo zypper refresh && sudo zypper update -y || true
-      elif need_cmd pacman; then
-        sudo pacman -Syu --noconfirm || true
-      else
-        echo -e "${C_YELLOW}Unsupported package manager. Skipping.${C_RESET}"
-      fi
-      ;;
-    *) ;;
-  esac
-}
-
-get_local_ip() {
-  local ip=""
-  if need_cmd hostname; then
-    ip=$(hostname -I 2>/dev/null | awk '{print $1}') || true
-  fi
-  if [ -z "$ip" ] && need_cmd ip; then
-    ip=$(ip -4 route get 1.1.1.1 2>/dev/null | awk 'NR==1{for(i=1;i<=NF;i++) if($i=="src") {print $(i+1); exit}}') || true
-  fi
-  echo "${ip:--}"
-}
-
-get_public_ip() {
-  local pip=""
-  if need_cmd curl; then
-    pip=$(curl -fsS --max-time 3 https://api.ipify.org || true)
-  elif need_cmd wget; then
-    pip=$(wget -qO- --timeout=3 https://api.ipify.org || true)
-  fi
-  echo "${pip:--}"
-}
-
-get_os_name() {
-  if [ -r /etc/os-release ]; then
-    . /etc/os-release
-    echo "${PRETTY_NAME:-${NAME:-Linux}}"
-  else
-    uname -sr
-  fi
-}
-
-get_ssh_port() {
-  local port=""
-  if need_cmd sshd; then
-    if sshd -T >/dev/null 2>&1; then
-      port=$(sshd -T 2>/dev/null | awk '/^port / {print $2; exit}')
+  if prompt_yes_no "Run system package update/upgrade now?"; then
+    if ! need_cmd sudo; then
+      log_error "sudo not found. Cannot perform update as non-root."
+      return 0
     fi
+    log_info "Updating packages..."
+    pkg_update || log_warn "Package update completed with errors"
   fi
-  if [ -z "$port" ]; then
-    local candidate=""
-    for f in /etc/ssh/sshd_config /etc/ssh/sshd_config.d/*.conf; do
-      [ -r "$f" ] || continue
-      candidate=$(awk 'tolower($1)=="port"{p=$2} END{if(p) print p}' "$f" || true)
-      if [ -n "$candidate" ]; then port="$candidate"; fi
-    done
-  fi
-  echo "${port:-22}"
 }
-
-get_cpu_cores() { nproc 2>/dev/null || echo 1; }
-get_ram_bytes() { awk '/MemTotal/ {print $2*1024}' /proc/meminfo; }
-get_disk_bytes_total() { df -B1 --output=size / | tail -1 | tr -d ' '; }
-get_disk_bytes_avail() { df -B1 --output=avail / | tail -1 | tr -d ' '; }
 
 print_dashboard() {
   local user os ssh_port cores ram_b disk_total_b disk_avail_b ip_local ip_public

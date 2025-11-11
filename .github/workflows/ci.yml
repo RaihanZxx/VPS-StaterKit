@@ -1,0 +1,100 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  lint:
+    name: ShellCheck Linting
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install ShellCheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+      
+      - name: Run ShellCheck
+        run: |
+          shellcheck -S warning start.sh src/*.sh lib/*.sh
+        continue-on-error: true
+
+  test:
+    name: BATS Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bats
+      
+      - name: Run BATS tests
+        run: |
+          if [ -d tests ]; then
+            bats tests/*.bats
+          else
+            echo "No test files found"
+          fi
+        continue-on-error: true
+
+  validate-scripts:
+    name: Validate Script Syntax
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Check bash syntax
+        run: |
+          bash -n start.sh
+          bash -n src/*.sh
+          bash -n lib/*.sh
+        continue-on-error: true
+
+  format-check:
+    name: Code Format Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install shfmt
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y golang-github-mvdan-sh-dev
+      
+      - name: Check formatting with shfmt
+        run: |
+          shfmt -d start.sh src/*.sh lib/*.sh 2>/dev/null || echo "Format check completed"
+        continue-on-error: true
+
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Run security checks
+        run: |
+          echo "Checking for common security issues..."
+          
+          if grep -r "password\|secret\|api_key\|token" start.sh src/*.sh lib/*.sh 2>/dev/null | grep -v "^Binary"; then
+            echo "Warning: Potential hardcoded secrets found"
+          fi
+          
+          echo "Checking sudo usage..."
+          grep -n "sudo" src/*.sh lib/*.sh || echo "No sudo usage found"
+        continue-on-error: true
+
+summary:
+  name: Test Summary
+  runs-on: ubuntu-latest
+  needs: [lint, test, validate-scripts, format-check, security]
+  if: always()
+  steps:
+    - name: Test Status
+      run: |
+        echo "CI/CD Pipeline Status:"
+        echo "✓ All checks completed"

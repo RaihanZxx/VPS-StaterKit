@@ -1,22 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Colors
-if [ -t 1 ]; then
-  C_RESET="\033[0m"; C_BOLD="\033[1m"; C_DIM="\033[2m";
-  C_CYAN="\033[36m"; C_GREEN="\033[32m"; C_YELLOW="\033[33m"; C_MAGENTA="\033[35m"; C_WHITE="\033[97m"; C_RED="\033[31m"
-else
-  C_RESET=""; C_BOLD=""; C_DIM=""; C_CYAN=""; C_GREEN=""; C_YELLOW=""; C_MAGENTA=""; C_WHITE=""; C_RED=""
-fi
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+LIB_DIR="${SCRIPT_DIR}/../lib"
+source "${LIB_DIR}/common.sh"
 
-numfmt_gib() { awk -v b="$1" 'BEGIN {printf "%.2f", b/1024/1024/1024}'; }
 round() { awk -v x="$1" 'BEGIN {printf "%d", (x<0)?int(x-0.5):int(x+0.5)}'; }
-
-get_ram_gib() { awk '/MemTotal/ {printf "%.2f", $2/1024/1024}' /proc/meminfo; }
 get_cpu_model() { awk -F: '/model name/ {gsub(/^ +/, "", $2); print $2; exit}' /proc/cpuinfo 2>/dev/null || echo "Unknown"; }
-get_cpu_cores() { nproc 2>/dev/null || echo 1; }
-get_disk_bytes_total() { df -B1 --output=size / | tail -1 | tr -d ' '; }
-get_disk_bytes_avail() { df -B1 --output=avail / | tail -1 | tr -d ' '; }
 
 recommend_swap_gib() {
   local ram_gib="$1"

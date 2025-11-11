@@ -1,14 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-need_cmd() { command -v "$1" >/dev/null 2>&1; }
-
-require_sudo() {
-  if ! need_cmd sudo; then
-    echo "sudo is required to install packages" >&2
-    exit 1
-  fi
-}
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+LIB_DIR="${SCRIPT_DIR}/../lib"
+source "${LIB_DIR}/common.sh"
 
 enable_and_start() {
   if need_cmd systemctl; then
