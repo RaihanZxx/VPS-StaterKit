@@ -88,7 +88,7 @@ jobs:
           grep -n "sudo" src/*.sh lib/*.sh || echo "No sudo usage found"
         continue-on-error: true
 
-workflow-summary:
+workflow_summary:
   name: Test Summary
   runs-on: ubuntu-latest
   needs: [lint, test, validate-scripts, format-check, security]
